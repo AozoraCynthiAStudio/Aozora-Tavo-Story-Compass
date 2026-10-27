@@ -1,0 +1,35 @@
+{
+  "specVersion": 2,
+  "id": "com.aozora.plot-inspiration",
+  "name": "Aozora剧情罗盘",
+  "version": "1.0.0",
+  "minAppVersion": "1.3.0",
+  "author": "Aozora",
+  "description": "结合最近剧情、记忆与人物设定，提供5条能带来不同变化的短灵感；复制到输入框后可继续修改。",
+  "releaseNotes": "首个正式版：按需生成交集、线索、抉择、开拓、亲密五条路线；特定剧情下追加特殊走向。独立面板，复制后修改；隐藏后继续生成，完成后自动打开。",
+  "cover": "cover.webp",
+  "localization": {
+    "defaultLocale": "zh-CN"
+  },
+  "permissions": [
+    "generate",
+    "input",
+    "message",
+    "variable",
+    "file"
+  ],
+  "contributes": {
+    "lastMessageActions": [
+      {
+        "id": "open-inspiration",
+        "label": "剧情罗盘",
+        "icon": "assets/marketplace-icon.png",
+        "role": "character"
+      }
+    ]
+  },
+  "entry": [
+    "diagnostics.js",
+    "entry.js"
+  ]
+}
