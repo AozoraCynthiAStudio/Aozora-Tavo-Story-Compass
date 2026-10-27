@@ -63,6 +63,8 @@ On-demand inspiration for your next roleplay moment.
 
 不满意可以点击“换一批”。它会尝试避开近期候选的事件核心、轮换出题角度；模型仍可能给出相似内容，不能保证每次都完全不同。
 
+如果模型未写齐五条完整路线，会显示“灵感未生成完整”，可以直接重试；空白或仅有标题的内容不会作为完整结果展示。重试由你主动点击，不自动增加 API 调用。
+
 ### 3. 复制之后，还是你的故事
 
 点击“复制到输入框”，面板收起，内容进入聊天输入框。你可以删改措辞、补自己的动作，也可以只保留一个想法。复制不会替你发送消息。
@@ -131,6 +133,8 @@ Requires Tavo 1.3.0+ and a configured text AI service. Download the `.tpg` asset
 
 Each generation or reroll makes an additional text AI call. Cost and latency depend on your model, provider, and context. Suggestions may repeat ideas or misunderstand memory, identities, time, or other story facts; review and edit them. Compatibility with every theme or third-party plugin is not guaranteed.
 
+If fewer than five complete regular routes are returned, the panel shows an incomplete-result state with a retry button. Empty or metadata-only cards are not displayed as successful results. Retries require a manual click; no automatic extra request is made.
+
 Export diagnostic logs from the panel and report reproducible problems in [Issues](https://github.com/AozoraCynthiAStudio/Aozora-Tavo-Story-Compass/issues). Plugin diagnostics do not save full story or prompt text by default. Tavo context logs are separate and may contain private material: review before sharing.
 
 ## Source & build / 源码与打包
@@ -142,6 +146,8 @@ powershell -File scripts/build.ps1
 ```
 
 The script checks JavaScript syntax and creates a `.tpg` package plus SHA-256 checksum in `dist/`. No npm dependencies are required for packaging. These checks verify packaging, not model quality or compatibility on every device.
+
+Run parser/completeness regression checks with `node tests/options.test.cjs`.
 
 ## License & screenshots / 授权与截图
 

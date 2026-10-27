@@ -1,6 +1,6 @@
 // Shared by the ordered entry scripts. Never record story text or API payloads.
 var aozoraCompassLog = (function () {
-  var version = "1.0.0";
+  var version = "1.0.1";
   var captureSuggestions = false;
   var runSequence = 0;
   var runs = [];
@@ -27,7 +27,11 @@ var aozoraCompassLog = (function () {
       if (typeof value === "boolean" || (typeof value === "number" && isFinite(value))) result[name] = value;
       else if (typeof value === "string") result[name] = value.slice(0, 96);
     });
-    ["selectedMemoryIndices", "sourceMessageIds", "messageRoles"].forEach(function (name) {
+    ["complete", "validOptions"].forEach(function (name) {
+      var value = data && data[name];
+      if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) result[name] = value;
+    });
+    ["selectedMemoryIndices", "sourceMessageIds", "messageRoles", "missingRoutes"].forEach(function (name) {
       if (data && Array.isArray(data[name])) result[name] = data[name].slice(0,256).filter(function (value) { return typeof value === "number" || typeof value === "string"; }).map(function (value) { return typeof value === "string" ? value.slice(0,48) : value; });
     });
     if (captureSuggestions && data && Array.isArray(data.options)) result.options = data.options.slice(0,5).map(function (item) { return { title:String(item.title || "").slice(0,48), draft:String(item.draft || "").slice(0,700) }; });

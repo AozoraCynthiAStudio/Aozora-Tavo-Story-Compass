@@ -42,7 +42,7 @@
     title.textContent = "Aozora剧情罗盘";
     var versionBadge = document.createElement("span");
     versionBadge.className = "asi-dialog-version";
-    versionBadge.textContent = "1.0.0";
+    versionBadge.textContent = "1.0.1";
     title.appendChild(versionBadge);
     var logButton = document.createElement("button");
     logButton.type = "button";
@@ -249,7 +249,7 @@
   "第六条为可选特殊走向，方向写特殊，放最后。亲密与欲望是相互影响的两条变化：情感靠近可伴随欲望萌生、克制松动；体验吸引、主动放纵也可伴随好感或依赖，不要求先有爱情或高好感。相关人物须明确成年，且近期真实互动已表现双方自愿的吸引、好奇、享受或主动尝试，才可给一个非露骨的欲望表达、体验邀请或放开克制的入口，不必等到已有明显沉溺；与第五条的情感靠近有实质区别。享受不等于爱情、服从或人格改变，不以身体反应、沉默或没有拒绝推定同意。黑化、立场背离、恶堕须另有明确剧情依据，不由亲密自动推导。世界书成人设定、未采用候选不算进展；无依据只给5条，不凑第六条，不涉及未成年、年龄不明或非自愿的性化情节。",
   "时间以故事正文为准，不用现实日期或消息发送时间代替。先确认最近明确的故事日期、时段及其后已发生的跨日/跳时；今天、明天、后天、昨晚均相对于说出那句话的故事时点，旧记忆中的明天不能直接搬到现在。区分已发生、正在做、未来约定；过去约定不自动续期，未明确取消也不等于仍在未来。时间线索附有来源与顺序，仅供核对，不能把未来计划当当前时间。无法确定绝对日期时保留相对关系，不猜星期、日期或具体时刻；无依据不跳日、不重演已完成事项。",
   "标题2到8字，表达意图或可能走向；正文沿用当前人称，直接写动作、对白或当场事件，1到2句、通常25到55字、最多70字。可现在邀请未来活动，不跳过当下、不替玩家出门或完成重大决定，不预写接受和成功。",
-  "只输出suggestion块，无前言、分类解释或围栏。常规方向依次为交集、线索、抉择、开拓、亲密，第六方向特殊可省略：<suggestion><direction>交集</direction><event>不含日期时间的事件核心，6到16字，写清要处理什么</event><title>短标题</title><draft>短入口</draft></suggestion> event只作下次避重，不显示；不能用空泛路线名称充当事件摘要。"
+  "即使正文很短或资料稀少，也须写齐五条常规路线的具体正文，不输出空白、占位符或仅标题。可从已知当下提出询问、观察、表达边界、新活动与非性化陪伴等小入口；允许合理的新变化，不编造重要旧关系或未知人物身份，不确定的设定不写死。只输出suggestion块，无前言、分类解释或围栏。常规方向依次为交集、线索、抉择、开拓、亲密，第六方向特殊可省略：<suggestion><direction>交集</direction><event>不含日期时间的事件核心，6到16字，写清要处理什么</event><title>短标题</title><draft>短入口</draft></suggestion> event只作下次避重，不显示；不能用空泛路线名称充当事件摘要。"
 ].join("\n");
 
   function priorPrompt(batches) {
@@ -1047,7 +1047,11 @@
       .replace(/&gt;/gi, ">")
       .replace(/&quot;/gi, "\"")
       .replace(/&#39;/gi, "'")
-      .replace(/[\u200b-\u200d\ufeff]/g, "")
+      .replace(/&#(x[0-9a-f]+|\d+);/gi, function (_, encoded) {
+        var point = /^x/i.test(encoded) ? parseInt(encoded.slice(1), 16) : Number(encoded);
+        return point >= 0 && point <= 0x10ffff ? String.fromCodePoint(point) : "";
+      })
+      .replace(/[\u200b-\u200f\u2060\ufeff]/g, "")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -1061,11 +1065,16 @@
       draft = cleanText(value);
     } else if (value && typeof value === "object") {
       title = cleanText(value.title || value.label || value.name || "");
-      draft = cleanText(value.draft || value.idea || value.inspiration || value.beat || value.action || value.text || value.content || value.suggestion || value.option || "");
+      var draftFields = [value.draft, value.idea, value.inspiration, value.beat, value.action, value.text, value.content, value.suggestion, value.option];
+      for (var di = 0; di < draftFields.length; di++) {
+        if (typeof draftFields[di] !== "string") continue;
+        var candidateDraft = cleanText(draftFields[di]);
+        if (isUsableDraft(candidateDraft)) { draft = candidateDraft; break; }
+      }
       impact = cleanText(value.impact || value.consequence || value.result || value.why || "");
       direction = cleanText(value.direction || "");
     }
-    if (!draft) return null;
+    if (!isUsableDraft(draft)) return null;
     if (!title) title = "剧情灵感 " + (index + 1);
     return {
       title: title.slice(0, 48),
@@ -1074,6 +1083,18 @@
       draft: draft.slice(0, 700),
       impact: impact.slice(0, 180)
     };
+  }
+
+  function isUsableDraft(text) {
+    var content = String(text || "").trim();
+    return /[\p{L}\p{N}]/u.test(content) &&
+      !/^(?:null|undefined|n\/?a|none|\[object Object\]|暂无(?:内容)?|无(?:内容)?|待补充|待生成|交集|线索|抉择|开拓|亲密|特殊)$/i.test(content);
+  }
+
+  function missingRoutes(items) {
+    return ["交集", "线索", "抉择", "开拓", "亲密"].filter(function (route) {
+      return !items.some(function (item) { return item.direction === route && isUsableDraft(item.draft); });
+    });
   }
 
   function optionList(value) {
@@ -1111,30 +1132,33 @@
       try {
         var parsed = JSON.parse(candidates[ci]);
         var jsonItems = optionList(parsed).map(itemFrom).filter(Boolean);
-        if (jsonItems.length) return result(jsonItems, false);
+        if (Array.isArray(parsed) || ["options", "items", "suggestions", "ideas"].some(function (field) { return parsed && Array.isArray(parsed[field]); })) return result(jsonItems, false);
       } catch (e) {}
     }
 
     var tagged = [];
     var tagPattern = /<(?:option|opt|suggestion|idea)\b[^>]*>([\s\S]*?)<\/(?:option|opt|suggestion|idea)>/gi;
     var match;
+    var sawTagged = false;
     while ((match = tagPattern.exec(text))) {
+      sawTagged = true;
       var body = match[1];
       var titleMatch = body.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
       var directionMatch = body.match(/<direction\b[^>]*>([\s\S]*?)<\/direction>/i);
-      var draftMatch = body.match(/<(?:draft|action|inspiration|idea)\b[^>]*>([\s\S]*?)<\/(?:draft|action|inspiration|idea)>/i);
+      var draftMatch = body.match(/<(draft|action|inspiration|idea|text|content|beat)\b[^>]*>([\s\S]*?)<\/\1>/i);
       var impactMatch = body.match(/<(?:impact|consequence|result)\b[^>]*>([\s\S]*?)<\/(?:impact|consequence|result)>/i);
-      var taggedValue = draftMatch ? {
+      var hasMetadata = /<(?:title|direction|event|impact|consequence|result)\b/i.test(body);
+      var taggedValue = draftMatch || hasMetadata ? {
         title: titleMatch ? titleMatch[1] : "",
         direction: directionMatch ? directionMatch[1] : "",
         event: (body.match(/<event\b[^>]*>([\s\S]*?)<\/event>/i)||[])[1] || "",
-        draft: draftMatch[1],
+        draft: draftMatch ? draftMatch[2] : cleanText(body.replace(/<(title|direction|event|impact|consequence|result)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")),
         impact: impactMatch ? impactMatch[1] : ""
       } : body;
       var taggedItem = itemFrom(taggedValue, tagged.length);
       if (taggedItem) tagged.push(taggedItem);
     }
-    if (tagged.length) return result(tagged, false);
+    if (sawTagged) return result(tagged, false);
 
     var normalized = text
       .replace(/\x60{3}(?:json)?/gi, "")
@@ -1350,7 +1374,13 @@
       var parseStartedAt = Date.now();
       var parsed = parseOptions(result);
       diagnostic.log("generation.parsed", { ms: Date.now() - parseStartedAt, count: parsed.items.length, fallback: !!parsed.fallback, resultCharacters: String(result || "").length });
-      if (!parsed.items.length) throw new Error("模型未返回可用选项，请重试并导出上下文日志。");
+      var missing = missingRoutes(parsed.items);
+      diagnostic.log("generation.completeness", { complete: missing.length === 0, validOptions: parsed.items.length, missingRoutes: missing });
+      if (missing.length) {
+        var incompleteError = new Error("只收到 " + (5 - missing.length) + "/5 条完整路线，请点击重试。");
+        incompleteError.code = "INCOMPLETE_OPTIONS";
+        throw incompleteError;
+      }
       var comparison=compareSuggestionBatch(parsed.items,suggestionHistory);
       diagnostic.log("generation.novelty",{previousBatches:suggestionHistory.length,exactDraftOverlap:comparison.overlap,wholeBatchRepeated:comparison.repeated});
       if(comparison.repeated)throw new Error("模型返回了重复的一批灵感，请重试。旧结果未作为新结果展示。");
@@ -1384,6 +1414,13 @@
       if (root.isConnected) {
         setStatus("生成失败：" + String(e && e.message ? e.message : e).slice(0, 140));
         showRetry("生成失败，可以直接重试。", "生成失败，点击重试");
+        if (e && e.code === "INCOMPLETE_OPTIONS") {
+          var incompleteTitle = root.querySelector(".asi-error-title");
+          var incompleteHint = root.querySelector(".asi-error-hint");
+          if (incompleteTitle) incompleteTitle.textContent = "灵感未生成完整";
+          if (incompleteHint) incompleteHint.textContent = e.message;
+          relayout();
+        }
       }
     } finally {
       busy = false;
