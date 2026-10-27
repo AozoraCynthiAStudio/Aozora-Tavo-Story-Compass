@@ -63,7 +63,7 @@ On-demand inspiration for your next roleplay moment.
 
 不满意可以点击“换一批”。它会尝试避开近期候选的事件核心、轮换出题角度；模型仍可能给出相似内容，不能保证每次都完全不同。
 
-如果模型未写齐五条完整路线，会显示“灵感未生成完整”，可以直接重试；空白或仅有标题的内容不会作为完整结果展示。重试由你主动点击，不自动增加 API 调用。
+插件会按整条选项分组，并检查五条常规路线是否完整，以减少空白、标题或摘要被拆成选项的情况。偶尔仍遇到内容不完整或异常时，点击“重试”或“换一批”重新生成即可。重试由你主动点击，不自动增加 API 调用。
 
 ### 3. 复制之后，还是你的故事
 
@@ -134,6 +134,8 @@ Requires Tavo 1.3.0+ and a configured text AI service. Download the `.tpg` asset
 Each generation or reroll makes an additional text AI call. Cost and latency depend on your model, provider, and context. Suggestions may repeat ideas or misunderstand memory, identities, time, or other story facts; review and edit them. Compatibility with every theme or third-party plugin is not guaranteed.
 
 If fewer than five complete regular routes are returned, the panel shows an incomplete-result state with a retry button. Empty or metadata-only cards are not displayed as successful results. Retries require a manual click; no automatic extra request is made.
+
+Whole-option grouping helps reduce malformed results, but occasional issues can still occur. Use Retry or Reroll if the options look incomplete or incorrect.
 
 Export diagnostic logs from the panel and report reproducible problems in [Issues](https://github.com/AozoraCynthiAStudio/Aozora-Tavo-Story-Compass/issues). Plugin diagnostics do not save full story or prompt text by default. Tavo context logs are separate and may contain private material: review before sharing.
 

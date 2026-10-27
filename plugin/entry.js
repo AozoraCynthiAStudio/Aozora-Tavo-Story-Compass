@@ -1117,11 +1117,11 @@
   function parseOptions(raw) {
     var text = String(raw == null ? "" : raw).trim();
     if (!text) return { items: [], fallback: false };
-    function result(items, fallback) {
+    function result(items, fallback, format) {
       var unique=uniqueItems(items), normal=unique.filter(function(x){return x.direction!=="特殊";}).slice(0,5);
       var special=unique.find(function(x){return x.direction==="特殊";});
       if(special && normal.length===5)normal.push(special);
-      return { items: normal, fallback: !!fallback };
+      return { items: normal, fallback: !!fallback, format: format || "unknown" };
     }
     var candidates = [text];
     var fenced = text.match(/\x60{3}(?:json)?\s*([\s\S]*?)\x60{3}/i);
@@ -1132,17 +1132,17 @@
       try {
         var parsed = JSON.parse(candidates[ci]);
         var jsonItems = optionList(parsed).map(itemFrom).filter(Boolean);
-        if (Array.isArray(parsed) || ["options", "items", "suggestions", "ideas"].some(function (field) { return parsed && Array.isArray(parsed[field]); })) return result(jsonItems, false);
+        if (Array.isArray(parsed) || ["options", "items", "suggestions", "ideas"].some(function (field) { return parsed && Array.isArray(parsed[field]); })) return result(jsonItems, false, "json");
       } catch (e) {}
     }
 
     var tagged = [];
-    var tagPattern = /<(?:option|opt|suggestion|idea)\b[^>]*>([\s\S]*?)<\/(?:option|opt|suggestion|idea)>/gi;
+    var tagPattern = /<(option|opt|suggestion|idea)\b[^>]*>([\s\S]*?)<\/\1>/gi;
     var match;
     var sawTagged = false;
     while ((match = tagPattern.exec(text))) {
       sawTagged = true;
-      var body = match[1];
+      var body = match[2];
       var titleMatch = body.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
       var directionMatch = body.match(/<direction\b[^>]*>([\s\S]*?)<\/direction>/i);
       var draftMatch = body.match(/<(draft|action|inspiration|idea|text|content|beat)\b[^>]*>([\s\S]*?)<\/\1>/i);
@@ -1158,45 +1158,76 @@
       var taggedItem = itemFrom(taggedValue, tagged.length);
       if (taggedItem) tagged.push(taggedItem);
     }
-    if (sawTagged) return result(tagged, false);
+    if (sawTagged) return result(tagged, false, "xml");
 
     var normalized = text
       .replace(/\x60{3}(?:json)?/gi, "")
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/(?:p|li|div)>/gi, "\n")
-      .replace(/<\/?(?:Options|DirectorNotes|offcam)\b[^>]*>/gi, "\n");
+      .replace(/<\/?(?:Options|DirectorNotes|offcam)\b[^>]*>/gi, "\n")
+      .replace(/<(direction|title|event|draft|content|text|action|inspiration|beat|impact)\b[^>]*>([\s\S]*?)<\/\1>/gi, function (_, field, value) { return "\n" + field + ": " + value + "\n"; });
     var lines = normalized.split(/\r?\n/).map(function (line) {
-      return line.trim().replace(/^\*\*|\*\*$/g, "");
+      return line.trim().replace(/\*\*|__/g, "");
     }).filter(Boolean);
-    var numbered = [];
-    for (var li = 0; li < lines.length; li++) {
-      var line = lines[li];
-      var numberedPrefix = /^\s*(?:(?:\d{1,2}\s*[.、．)）:：-])|[①②③④⑤⑥⑦⑧⑨⑩]|【(?:\d{1,2}|[一二三四五])】|[一二三四五]\s*[、.])\s*/;
-      var namedPrefix = /^\s*(?:选项|方向|方案|option)\s*\d{1,2}\s*[:：.、)）-]\s*/i;
-      if (numberedPrefix.test(line)) line = line.replace(numberedPrefix, "");
-      else if (namedPrefix.test(line)) line = line.replace(namedPrefix, "");
-      else if (/^[\-\*•]\s+/.test(line)) line = line.replace(/^[\-\*•]\s+/, "");
-      else continue;
-      if (line.length >= 5) {
-        var lineItem = itemFrom(line, numbered.length);
-        if (lineItem) numbered.push(lineItem);
+    // Only an option boundary starts a new card. Field/bullet lines stay inside that option.
+    var blocks = [], current = null, fieldMode = "", sawBoundary = false;
+    function beginBlock() { flushBlock(); current = { title: "", direction: "", event: "", draft: [], free: [], explicitDraft: false }; fieldMode = ""; sawBoundary = true; }
+    function flushBlock() {
+      if (!current) return;
+      var body = (current.explicitDraft ? current.draft : current.free).join("\n");
+      var item = itemFrom({title:current.title,direction:current.direction,event:current.event,draft:body},blocks.length);
+      if (item) blocks.push(item);
+      current = null;
+    }
+    var routeHeading = /^(?:路线\s*[:：]?\s*)?[【\[]?(交集|线索|抉择|开拓|亲密|特殊(?:走向)?)[】\]]?(?:\s*[：:|｜·—-]\s*(.*))?$/;
+    lines.forEach(function (line) {
+      var heading = /^#{1,6}\s+/.test(line);
+      line = line.replace(/^#{1,6}\s+/, "");
+      var numbered = line.match(/^(?:(?:\d{1,2}\s*[.、．)）:：-])|[①②③④⑤⑥]|【(?:\d{1,2}|[一二三四五六])】|[一二三四五六]\s*[、.])\s*(.*)$/);
+      var named = line.match(/^(?:选项|方案|option)\s*\d{1,2}\s*[:：.、)）-]?\s*(.*)$/i);
+      var isNumbered = !!(numbered || named);
+      if (isNumbered) { beginBlock(); line = (numbered || named)[1]; }
+      line = line.replace(/^[\-*•]\s+/, "");
+      var field = line.match(/^(方向|路线|标题|事件(?:核心|摘要)?|正文|内容|动作|对白|可能影响|影响|direction|title|event|draft|content|text|action|inspiration|beat|impact)\s*[:：]\s*(.*)$/i);
+      if (field) {
+        var name = field[1].toLowerCase(), value = field[2];
+        if (/^(?:方向|路线|direction)$/.test(name)) {
+          if (!current || current.direction || current.explicitDraft || current.free.length) beginBlock();
+          current.direction = value.replace(/^特殊走向$/, "特殊"); fieldMode = "metadata";
+        } else {
+          if (!current) beginBlock();
+          if (/^(?:正文|内容|动作|对白|draft|content|text|action|inspiration|beat)$/.test(name)) {
+            current.explicitDraft = true; current.draft.push(value); fieldMode = "draft";
+          } else {
+            if (/^(?:标题|title)$/.test(name)) current.title = value;
+            if (/^(?:事件(?:核心|摘要)?|event)$/.test(name)) current.event = value;
+            fieldMode = "metadata";
+          }
+        }
+        return;
       }
-    }
-    if (numbered.length) return result(numbered, false);
-
-    var plainLines = lines.filter(function (line) {
-      return line.length >= 18 && !/^(?:以下|建议如下|剧情灵感|选项|方向|结果|json|options)\b/i.test(line);
+      var route = line.match(routeHeading);
+      if (route) {
+        if (!current || !isNumbered) beginBlock();
+        current.direction = route[1].replace(/^特殊走向$/, "特殊");
+        if (route[2]) current.title = route[2]; fieldMode = ""; return;
+      }
+      if (!current) return;
+      if (isNumbered || heading) {
+        // An ambiguous short heading is a title, not a complete draft. Do not pad with metadata.
+        if (/[。！？!?，,“”「」"]/.test(line)) { current.free.push(line); fieldMode = "free"; }
+        else { current.title = line; fieldMode = ""; }
+      } else if (fieldMode === "draft") current.draft.push(line);
+      else if (fieldMode !== "metadata") { current.free.push(line); fieldMode = "free"; }
     });
-    if (plainLines.length > 1) {
-      var plainItems = plainLines.map(itemFrom).filter(Boolean);
-      if (plainItems.length > 1) return result(plainItems, false);
-    }
+    flushBlock();
+    if (sawBoundary) return result(blocks, false, "text-blocks");
 
     var rawItem = itemFrom(text, 0);
     if (rawItem) {
       rawItem.title = "剧情灵感";
       rawItem.impact = "未按多项格式分段；可直接修改或换一批重试。";
-      return result([rawItem], true);
+      return result([rawItem], true, "plain-unsegmented");
     }
     return { items: [], fallback: false };
   }
@@ -1373,7 +1404,7 @@
       }
       var parseStartedAt = Date.now();
       var parsed = parseOptions(result);
-      diagnostic.log("generation.parsed", { ms: Date.now() - parseStartedAt, count: parsed.items.length, fallback: !!parsed.fallback, resultCharacters: String(result || "").length });
+      diagnostic.log("generation.parsed", { source: parsed.format || "empty", ms: Date.now() - parseStartedAt, count: parsed.items.length, fallback: !!parsed.fallback, resultCharacters: String(result || "").length });
       var missing = missingRoutes(parsed.items);
       diagnostic.log("generation.completeness", { complete: missing.length === 0, validOptions: parsed.items.length, missingRoutes: missing });
       if (missing.length) {

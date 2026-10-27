@@ -6,7 +6,7 @@
   "minAppVersion": "1.3.0",
   "author": "Aozora",
   "description": "结合最近剧情、记忆与人物设定，提供5条能带来不同变化的短灵感；复制到输入框后可继续修改。",
-  "releaseNotes": "修复空选项与不完整结果被当作成功：兼容正文标签，过滤空白和占位内容，五条常规路线缺失时明确提示重试，不自动增加API调用。",
+  "releaseNotes": "优化选项解析与分组，减少选项不完整、标题或摘要被拆成选项等问题的出现频率。如果仍然出现异常，点击重试或换一批重新生成即可。不自动增加API调用。",
   "cover": "cover.webp",
   "localization": {
     "defaultLocale": "zh-CN"
